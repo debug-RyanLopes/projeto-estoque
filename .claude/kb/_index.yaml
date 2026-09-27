@@ -945,9 +945,9 @@ domains:
 
   python-frameworks:
     name: python-frameworks
-    description: "Web/ORM frameworks over Python with no dedicated coverage elsewhere — FastAPI, Flask, Django, SQLAlchemy, pandas. Hand-authored, not MCP-validated (see index.md note); does not duplicate pydantic/ or python/"
+    description: "Web/ORM frameworks over Python with no dedicated coverage elsewhere — FastAPI, Flask, Django, SQLAlchemy, pandas. Hand-authored, not MCP-validated (see index.md note); does not duplicate pydantic/ or python/. Exception: fastapi pattern is source-verified (2026-09-26) — see its entry below and index.md"
     path: python-frameworks/
-    mcp_validated: null  # hand-authored, pending validation — see .claude/kb/python-frameworks/index.md
+    mcp_validated: null  # hand-authored, pending validation — see .claude/kb/python-frameworks/index.md — fastapi pattern is the exception, source-verified 2026-09-26 (not via MCP, via direct fetch of fastapi.tiangolo.com + PyPI)
     entry_points:
       index: index.md
       quick_reference: quick-reference.md
@@ -955,7 +955,7 @@ domains:
     patterns:
       - name: fastapi
         path: patterns/fastapi.md
-        confidence: 0.70
+        confidence: 0.95  # source-verified 2026-09-26 against fastapi.tiangolo.com (tutorial + release notes) and PyPI metadata — see patterns/fastapi.md header and index.md note
       - name: flask
         path: patterns/flask.md
         confidence: 0.70

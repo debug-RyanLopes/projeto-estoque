@@ -1,1 +1,8 @@
 anthropic
+fastapi
+uvicorn[standard]
+sqlalchemy
+jinja2
+python-multipart
+pytest
+httpx

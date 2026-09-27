@@ -37,6 +37,12 @@ referência de boa-fé, não como conteúdo com a mesma barra de confiança dos 
 domínios registrados em `_index.yaml`. Para elevar ao mesmo padrão, rodar
 `/create-kb python-frameworks --validated`.
 
+**Exceção: `patterns/fastapi.md`** passou pelo processo `kb-build` completo
+(pesquisa + verificação adversarial + fact-check independente) em 2026-09-26,
+contra fastapi.tiangolo.com (tutorial + release notes) e PyPI metadata —
+confidence elevada para 0.95 em `_index.yaml`. `flask.md`, `django.md`,
+`sqlalchemy.md` e `pandas.md` continuam hand-authored/não validados.
+
 ---
 
 ## Agent Usage
