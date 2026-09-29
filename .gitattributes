@@ -1,0 +1,3 @@
+# Makefile precisa de LF (com CRLF o make quebra no Windows)
+Makefile text eol=lf
+*.sh text eol=lf

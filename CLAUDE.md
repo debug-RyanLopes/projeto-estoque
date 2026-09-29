@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-An early-stage project (single script) that calls the Claude API to act as an assistant for
-an inventory (estoque) management system. There is no inventory data model, storage, or
-tooling yet — `main.py` sends one free-text question to Claude and prints the answer.
+A local, single-user stock-control (estoque) web app: FastAPI + SQLAlchemy 2.0 + SQLite + Jinja2
+templates (server-rendered, Tailwind CSS built locally). Features: product registration,
+entrada/saida movements, low-stock alert. No external services, API keys or paid dependencies are used.
 
 ## Setup and running
 
@@ -14,29 +14,34 @@ tooling yet — `main.py` sends one free-text question to Claude and prints the 
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-$env:ANTHROPIC_API_KEY = "sk-ant-..."
-python main.py "How should I organize SKUs for a small warehouse?"
+alembic upgrade head            # creates/updates estoque.db
+uvicorn app.main:app --reload   # or: make run
+pytest                          # or: make test
 ```
-
-There is no test suite or lint config in this repo yet.
 
 ## Architecture
 
-- [main.py](main.py) — entire application. `ask_claude()` sends a single request via
-  `client.beta.messages.create()` and returns the concatenated text blocks; `main()` wires up
-  the CLI argument, the `Anthropic()` client, and top-level error handling for the SDK's typed
-  exceptions (auth, rate limit, API status, connection).
-- Model and system prompt are set as module-level constants (`MODEL`, `SYSTEM_PROMPT`) in
-  `main.py`, not read from config — change them there directly.
-- The request enables adaptive thinking and opts into server-side model fallback
-  (`fallbacks="default"` under the `server-side-fallback-2026-07-01` beta): if Claude's safety
-  classifier declines a request, the API retries it on a recommended backup model
-  automatically. `response.stop_reason == "refusal"` is checked before reading `response.content`
-  because a fallback can still itself refuse.
-- Credentials are read from the environment (`ANTHROPIC_API_KEY`), never hardcoded.
+- [app/main.py](app/main.py) — routes only. Routes are plain `def` (not `async def`) on purpose:
+  SQLAlchemy is synchronous, so FastAPI must run them in its threadpool. They translate HTTP ->
+  service call -> redirect, mapping `services.EstoqueError` subclasses to `/?erro=...`.
+- [app/services.py](app/services.py) — all business rules. Two concurrency decisions live here:
+  stock changes are a single conditional `UPDATE ... SET quantidade = quantidade + delta
+  [WHERE quantidade >= q]` (no read-modify-write), and product creation relies on the UNIQUE
+  constraint on `sku` (catch `IntegrityError`) instead of check-then-insert.
+- [app/models.py](app/models.py) — `Produto` (soft-deleted via `ativo`) and `Movimentacao`, an
+  append-only history: ORM `before_update`/`before_delete` listeners raise
+  `MovimentacaoImutavelError`. Never hard-delete a product.
+- [app/config.py](app/config.py) — settings from env vars: `APP_ENV` (dev/test/prod) and
+  `DATABASE_URL`. [app/database.py](app/database.py) builds the engine from it (and enables
+  SQLite foreign keys).
+- [migrations/](migrations/) — Alembic. The app does NOT call `create_all`; schema changes need a
+  migration (`alembic revision --autogenerate -m ...`). A test checks migrations match the models.
+- Frontend: Tailwind classes in `app/templates/`; compiled CSS is committed at
+  `app/static/css/tailwind.css` (config in `tailwind.config.js`). After changing template classes or
+  colors run `make css` (needs Node). Do not reintroduce CDN links: the app must work offline.
 
-## Extending this project
+## Tests
 
-The natural next step when adding real inventory features is to give Claude tools (e.g.
-`get_product`, `list_low_stock`) via the `tools` parameter rather than only sending free text —
-there is no tool-use loop implemented yet.
+`tests/conftest.py` sets `APP_ENV=test` and a throwaway `DATABASE_URL` *before* importing `app`, and
+each test gets its own SQLite file via `dependency_overrides`. The suite must never touch
+`estoque.db`. Concurrency tests in `tests/test_servicos.py` use threads against a file DB.

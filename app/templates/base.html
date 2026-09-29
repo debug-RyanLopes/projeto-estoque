@@ -4,24 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Controle de Estoque</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            moss: {
-              DEFAULT: '#009394',
-              dark: '#006270',
-              light: '#00E0C7',
-              bg: '#2B3548',
-              contrast: '#424769',
-            },
-          },
-        },
-      },
-    }
-  </script>
+  <link rel="stylesheet" href="{{ url_for('static', path='css/tailwind.css') }}">
 </head>
 <body class="min-h-screen bg-moss-bg text-slate-900">
   <main class="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
