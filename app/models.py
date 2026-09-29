@@ -27,13 +27,17 @@ class Produto(Base):
 
 
 class Movimentacao(Base):
-    """Registro imutável: uma vez gravada, nunca é alterada nem apagada."""
+    """Registro imutável: uma vez gravada, nunca é alterada nem apagada.
+
+    tipo: "entrada" e "saida" mexem no saldo; "exclusao" só registra que o produto foi
+    excluído (quantidade = saldo que ele tinha) e NÃO entra na conta entradas - saídas.
+    """
 
     __tablename__ = "movimentacoes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     produto_id: Mapped[int] = mapped_column(ForeignKey("produtos.id"))
-    tipo: Mapped[str] = mapped_column(String(10))  # "entrada" ou "saida"
+    tipo: Mapped[str] = mapped_column(String(10))  # "entrada", "saida" ou "exclusao"
     quantidade: Mapped[int]
     data: Mapped[datetime] = mapped_column(default=_agora_utc)
 

@@ -1,6 +1,6 @@
 # Projeto Estoque
 
-Sistema web local de controle de estoque para pequenos negócios/uso pessoal: cadastro de produtos, registro de movimentações de entrada e saída, controle de preço de compra e venda, e alerta visual quando um produto atinge o estoque mínimo. Roda inteiramente na sua máquina, sem depender de serviços externos — os dados ficam num arquivo SQLite local.
+Sistema web local de controle de estoque para pequenos negócios/uso pessoal: cadastro de produtos (com estoque inicial), registro de movimentações de entrada e saída, histórico de movimentações (seção recolhível na tela), controle de preço de compra e venda, e alerta visual quando um produto atinge o estoque mínimo. Roda inteiramente na sua máquina, sem depender de serviços externos — os dados ficam num arquivo SQLite local.
 
 ## 🚀 Começando
 
@@ -81,12 +81,14 @@ Os testes em `tests/` usam o `TestClient` do FastAPI para simular requisições 
 ```
 tests/test_produtos.py
   - cadastro de produto aparece na listagem
+  - quantidade inicial define o saldo e gera uma entrada no histórico
   - SKU duplicado é rejeitado
   - exclusão remove o produto
 
 tests/test_movimentacoes.py
   - saída maior que o estoque disponível é rejeitada
   - alerta de estoque baixo liga/desliga conforme a quantidade
+  - histórico lista entradas e saídas, mais recentes primeiro
 
 tests/test_servicos.py
   - saídas simultâneas nunca deixam o estoque negativo (atomicidade)

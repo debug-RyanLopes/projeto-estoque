@@ -101,7 +101,7 @@ def test_excluir_produto_preserva_historico(db):
     services.excluir_produto(db, produto.id)
 
     assert services.listar_produtos(db) == []
-    assert db.scalar(select(func.count()).select_from(Movimentacao)) == 1
+    assert db.scalar(select(func.count()).select_from(Movimentacao)) == 2  # entrada + exclusão
     with pytest.raises(services.ProdutoNaoEncontradoError):
         services.registrar_movimentacao(db, produto.id, "entrada", 1)
     with pytest.raises(services.ProdutoNaoEncontradoError):
@@ -112,3 +112,49 @@ def test_tipo_invalido_e_rejeitado(db):
     produto = _novo_produto(db)
     with pytest.raises(services.TipoMovimentacaoInvalidoError):
         services.registrar_movimentacao(db, produto.id, "roubo", 1)
+
+
+def test_quantidade_inicial_gera_entrada_e_saldo_bate_com_historico(db):
+    produto = _novo_produto(db, quantidade_inicial=8)
+    services.registrar_movimentacao(db, produto.id, "saida", 3)
+
+    movs = services.listar_movimentacoes(db)
+    entradas = sum(m.quantidade for m in movs if m.tipo == "entrada")
+    saidas = sum(m.quantidade for m in movs if m.tipo == "saida")
+
+    assert (entradas, saidas) == (8, 3)
+    assert db.get(Produto, produto.id).quantidade == entradas - saidas == 5
+
+
+def test_sku_duplicado_com_quantidade_inicial_nao_deixa_movimentacao_orfa(db):
+    _novo_produto(db, quantidade_inicial=5)
+
+    with pytest.raises(services.SkuDuplicadoError):
+        _novo_produto(db, quantidade_inicial=99)
+
+    assert [m.quantidade for m in services.listar_movimentacoes(db)] == [5]
+
+
+def test_exclusao_registra_saldo_e_nao_conta_no_balanco(db):
+    produto = _novo_produto(db, quantidade_inicial=10)
+    services.registrar_movimentacao(db, produto.id, "saida", 4)
+
+    services.excluir_produto(db, produto.id)
+
+    ultima = services.listar_movimentacoes(db)[0]
+    assert (ultima.tipo, ultima.quantidade) == ("exclusao", 6)
+    movs = services.listar_movimentacoes(db)
+    entradas = sum(m.quantidade for m in movs if m.tipo == "entrada")
+    saidas = sum(m.quantidade for m in movs if m.tipo == "saida")
+    assert entradas - saidas == db.get(Produto, produto.id).quantidade == 6
+
+
+def test_excluir_duas_vezes_registra_uma_unica_exclusao(db):
+    produto = _novo_produto(db)
+    services.excluir_produto(db, produto.id)
+
+    with pytest.raises(services.ProdutoNaoEncontradoError):
+        services.excluir_produto(db, produto.id)
+
+    tipos = [m.tipo for m in services.listar_movimentacoes(db)]
+    assert tipos == ["exclusao"]

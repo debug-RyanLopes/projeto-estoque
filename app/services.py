@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from .models import Movimentacao, Produto
 
@@ -44,6 +44,17 @@ def listar_produtos(db: Session) -> list[Produto]:
     return list(db.scalars(select(Produto).where(Produto.ativo.is_(True)).order_by(Produto.nome)))
 
 
+def listar_movimentacoes(db: Session, limite: int = 200) -> list[Movimentacao]:
+    """Movimentações mais recentes primeiro (inclui as de produtos já excluídos)."""
+    stmt = (
+        select(Movimentacao)
+        .options(joinedload(Movimentacao.produto))
+        .order_by(Movimentacao.data.desc(), Movimentacao.id.desc())
+        .limit(limite)
+    )
+    return list(db.scalars(stmt))
+
+
 def criar_produto(
     db: Session,
     *,
@@ -52,11 +63,15 @@ def criar_produto(
     preco_compra: float | Decimal,
     preco_venda: float | Decimal,
     estoque_minimo: int = 0,
+    quantidade_inicial: int = 0,
 ) -> Produto:
     """Cria o produto confiando na constraint UNIQUE do banco para o SKU.
 
     Não fazemos "SELECT antes, INSERT depois": entre os dois, outra requisição
     poderia inserir o mesmo SKU (TOCTOU). Inserimos direto e tratamos o erro.
+
+    O estoque inicial vira uma movimentação de "entrada" na mesma transação, para o
+    histórico sempre explicar o saldo (saldo == entradas - saídas).
     """
     produto = Produto(
         nome=nome,
@@ -64,8 +79,10 @@ def criar_produto(
         preco_compra=preco_compra,
         preco_venda=preco_venda,
         estoque_minimo=estoque_minimo,
-        quantidade=0,
+        quantidade=quantidade_inicial,
     )
+    if quantidade_inicial > 0:
+        produto.movimentacoes.append(Movimentacao(tipo="entrada", quantidade=quantidade_inicial))
     db.add(produto)
     try:
         db.commit()
@@ -76,13 +93,17 @@ def criar_produto(
 
 
 def excluir_produto(db: Session, produto_id: int) -> None:
-    """Exclusão lógica: preserva o histórico de movimentações do produto."""
+    """Exclusão lógica: preserva o histórico e registra a exclusão nele."""
     result = db.execute(
         update(Produto).where(Produto.id == produto_id, Produto.ativo.is_(True)).values(ativo=False)
     )
     if result.rowcount == 0:
         db.rollback()
         raise ProdutoNaoEncontradoError()
+    # Lido DEPOIS do UPDATE, ainda na mesma transação: uma saída simultânea não
+    # consegue alterar o saldo (o produto já está inativo), então o valor é o final.
+    saldo = db.scalar(select(Produto.quantidade).where(Produto.id == produto_id))
+    db.add(Movimentacao(produto_id=produto_id, tipo="exclusao", quantidade=saldo))
     db.commit()
 
 

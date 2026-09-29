@@ -5,6 +5,7 @@ FastAPI executa rotas `def` num pool de threads, sem travar o event loop. Uma ro
 `async def` que chamasse o banco síncrono bloquearia o servidor inteiro durante a query.
 """
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
@@ -25,14 +26,26 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 
+def _data_local(valor: datetime) -> str:
+    """As datas são gravadas em UTC; mostramos no fuso do computador que roda o app."""
+    return valor.replace(tzinfo=timezone.utc).astimezone().strftime("%d/%m/%Y %H:%M")
+
+
+templates.env.filters["data_local"] = _data_local
+
+
 def _redirect_com_erro(mensagem: str) -> RedirectResponse:
     return RedirectResponse(url=f"/?erro={quote(mensagem)}", status_code=303)
 
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request, erro: str | None = None, db: Session = Depends(get_db)):
-    produtos = services.listar_produtos(db)
-    return templates.TemplateResponse(request, "index.html", {"produtos": produtos, "erro": erro})
+    context = {
+        "produtos": services.listar_produtos(db),
+        "movimentacoes": services.listar_movimentacoes(db),
+        "erro": erro,
+    }
+    return templates.TemplateResponse(request, "index.html", context)
 
 
 @app.post("/produtos")
@@ -42,6 +55,7 @@ def criar_produto(
     preco_compra: Annotated[float, Form(ge=0)],
     preco_venda: Annotated[float, Form(ge=0)],
     estoque_minimo: Annotated[int, Form(ge=0)] = 0,
+    quantidade: Annotated[int, Form(ge=0)] = 0,
     db: Session = Depends(get_db),
 ):
     try:
@@ -52,6 +66,7 @@ def criar_produto(
             preco_compra=preco_compra,
             preco_venda=preco_venda,
             estoque_minimo=estoque_minimo,
+            quantidade_inicial=quantidade,
         )
     except services.SkuDuplicadoError as exc:
         return _redirect_com_erro(str(exc))

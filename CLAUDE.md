@@ -27,7 +27,12 @@ pytest                          # or: make test
 - [app/services.py](app/services.py) — all business rules. Two concurrency decisions live here:
   stock changes are a single conditional `UPDATE ... SET quantidade = quantidade + delta
   [WHERE quantidade >= q]` (no read-modify-write), and product creation relies on the UNIQUE
-  constraint on `sku` (catch `IntegrityError`) instead of check-then-insert.
+  constraint on `sku` (catch `IntegrityError`) instead of check-then-insert. The initial stock given
+  at registration is also recorded as an "entrada" movement (same transaction), so the history always
+  sums to the balance (`quantidade == entradas - saidas`); keep that invariant. Deleting a product
+  logs a `tipo="exclusao"` movement (quantidade = balance at deletion) that is informational only and
+  must not be counted in that sum.
+  `listar_movimentacoes` feeds the collapsible "Registro de movimentações" section of the dashboard.
 - [app/models.py](app/models.py) — `Produto` (soft-deleted via `ativo`) and `Movimentacao`, an
   append-only history: ORM `before_update`/`before_delete` listeners raise
   `MovimentacaoImutavelError`. Never hard-delete a product.
